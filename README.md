@@ -33,11 +33,12 @@ so it picks them up.
 ## Available skills
 
 <!-- SKILLS:START -->
-**1 skill**
+**2 skills**
 
 | Skill | Description | Install |
 | --- | --- | --- |
 | [`example-skill`](skills/example-skill) | A template skill showing the expected structure. Copy this folder to start your own. Use when you need a starting point for a new Skills-Library entry. | `./install.sh example-skill` |
+| [`hook-engineering`](skills/hook-engineering) | Rewrites the opening hook of a content script using proven, high-retention hook formulas, then explains why each works. Use when you have a video, short, or social script and want a stronger first line that stops the scroll without overpromising. | `./install.sh hook-engineering` |
 <!-- SKILLS:END -->
 
 The table above is generated from each skill's `SKILL.md` frontmatter by a
