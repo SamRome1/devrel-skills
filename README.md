@@ -4,6 +4,10 @@ A shared library of [Claude skills](https://docs.claude.com/en/docs/claude-code/
 for the Supabase DevRel team. Each skill is a folder under [`skills/`](skills).
 Browse them right here on GitHub, and install any of them with one command.
 
+**🔎 Browse the gallery → [devrel-skills.vercel.app](https://devrel-skills.vercel.app/)** —
+a searchable view of every skill, with copy-paste install commands and a form to
+share your own. (The repo is the source of truth; the gallery reads from it.)
+
 ## Install a skill
 
 **Without cloning** (this repo is public):
@@ -51,13 +55,14 @@ skills/<name>/SKILL.md   ← a skill (plus any supporting files)
 install.sh               ← installer (clone mode + curl mode)
 scripts/gen-index.mjs    ← regenerates the table above from frontmatter
 .github/workflows/       ← runs the index generator on push
-web/ (the Next.js app)   ← optional browsable gallery — see below
+src/, next.config.ts …   ← the optional Next.js gallery (reads skills/) — see below
 ```
 
-## Optional: the web gallery
+## The web gallery
 
-This repo also contains a Next.js app (the `src/`, `next.config.ts`, etc. at the
-root) — a prettier, searchable gallery with a web form that opens a prefilled PR
-to add a skill. **It's optional**, and it reads this repo's `skills/` folder
-directly — the git repo stays the single source of truth, with no database to
-keep in sync. To run it, see [`docs/WEBAPP.md`](docs/WEBAPP.md).
+Live at **[devrel-skills.vercel.app](https://devrel-skills.vercel.app/)** — a
+searchable gallery with a web form that opens a prefilled PR to add a skill.
+It reads this repo's `skills/` folder directly, so the git repo stays the single
+source of truth (no database to keep in sync), and it redeploys automatically on
+every push to `main`. The site is optional — everything works from the repo and
+the installer alone. To run or tweak it locally, see [`docs/WEBAPP.md`](docs/WEBAPP.md).
