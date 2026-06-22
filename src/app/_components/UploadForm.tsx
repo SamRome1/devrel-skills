@@ -1,174 +1,194 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { newFileUrl } from "@/lib/config";
 
-type Mode = "folder" | "zip";
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
 
-type FileWithPath = File & { webkitRelativePath: string };
+// Minimal client-side frontmatter reader so dropping in an existing SKILL.md
+// pre-fills the form. Anything we don't recognize stays in the body.
+function parseSkillMd(text: string): {
+  name?: string;
+  description?: string;
+  tags?: string;
+  body: string;
+} {
+  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!m) return { body: text.trim() };
+  const fm: Record<string, string> = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!kv) continue;
+    let v = kv[2].trim();
+    if (
+      (v.startsWith('"') && v.endsWith('"')) ||
+      (v.startsWith("'") && v.endsWith("'"))
+    ) {
+      v = v.slice(1, -1);
+    }
+    fm[kv[1]] = v;
+  }
+  const tags = (fm.tags ?? "").replace(/^\[|\]$/g, "");
+  return {
+    name: fm.name,
+    description: fm.description,
+    tags,
+    body: m[2].trim(),
+  };
+}
+
+function buildSkillMd(
+  slug: string,
+  description: string,
+  tags: string[],
+  body: string,
+): string {
+  const fm = [`name: ${slug}`, `description: ${description}`];
+  if (tags.length) fm.push(`tags: [${tags.join(", ")}]`);
+  return `---\n${fm.join("\n")}\n---\n\n${body.trim()}\n`;
+}
 
 export function UploadForm() {
-  const router = useRouter();
-  const [mode, setMode] = useState<Mode>("folder");
-  const [author, setAuthor] = useState("");
-  const [picked, setPicked] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ slug: string; version: number } | null>(
-    null,
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
+  const [body, setBody] = useState("");
+
+  const slug = useMemo(() => slugify(name), [name]);
+  const tags = useMemo(
+    () =>
+      tagsInput
+        .split(",")
+        .map((t) => slugify(t))
+        .filter(Boolean),
+    [tagsInput],
   );
 
-  const folderRef = useRef<HTMLInputElement>(null);
-  const zipRef = useRef<HTMLInputElement>(null);
+  const ready = slug.length > 0 && description.trim().length > 0;
 
-  function onPick() {
-    const input = mode === "folder" ? folderRef.current : zipRef.current;
-    const files = input?.files ? Array.from(input.files) : [];
-    setPicked(
-      files.map((f) => (f as FileWithPath).webkitRelativePath || f.name),
-    );
-    setDone(null);
-    setError(null);
-  }
+  const prUrl = useMemo(() => {
+    if (!ready) return "#";
+    return newFileUrl(slug, buildSkillMd(slug, description.trim(), tags, body));
+  }, [ready, slug, description, tags, body]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setDone(null);
-
-    const form = new FormData();
-    form.set("author", author.trim() || "unknown");
-
-    if (mode === "zip") {
-      const file = zipRef.current?.files?.[0];
-      if (!file) {
-        setError("Choose a .zip file first.");
-        return;
-      }
-      form.set("file", file);
-    } else {
-      const files = folderRef.current?.files
-        ? Array.from(folderRef.current.files)
-        : [];
-      if (files.length === 0) {
-        setError("Choose a skill folder first.");
-        return;
-      }
-      const paths: string[] = [];
-      for (const f of files) {
-        form.append("files", f);
-        paths.push((f as FileWithPath).webkitRelativePath || f.name);
-      }
-      form.set("paths", JSON.stringify(paths));
-    }
-
-    setBusy(true);
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: form });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || "Upload failed.");
-      } else {
-        setDone({ slug: json.slug, version: json.version });
-        router.refresh();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally {
-      setBusy(false);
-    }
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const parsed = parseSkillMd(text);
+    if (parsed.name && !name) setName(parsed.name);
+    if (parsed.description) setDescription(parsed.description);
+    if (parsed.tags) setTagsInput(parsed.tags);
+    setBody(parsed.body);
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
+    <div className="space-y-5">
+      <div className="rounded-md border border-border bg-surface p-3 text-xs text-dim">
+        Skills live in the GitHub repo. This form builds your{" "}
+        <code>SKILL.md</code> and opens GitHub&apos;s &ldquo;new file&rdquo; flow
+        prefilled — review it, commit to a branch, and open a PR. No upload, no
+        login here.{" "}
+        <span className="text-dimmer">
+          Multi-file skills: create the PR here, then add the extra files to the
+          same branch on GitHub.
+        </span>
+      </div>
+
       <div>
-        <label className="mb-1.5 block text-sm font-medium">Your name</label>
+        <label className="mb-1.5 block text-sm font-medium">
+          Start from an existing <code>SKILL.md</code> (optional)
+        </label>
         <input
-          value={author}
-          onChange={(e) => setAuthor(e.target.value)}
-          placeholder="e.g. Sam"
+          type="file"
+          accept=".md,text/markdown"
+          onChange={onFile}
+          className="block w-full text-sm text-dim file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-3 file:py-1.5 file:text-sm file:text-text"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-sm font-medium">Skill name</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Postgres Migrations"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-border-strong"
+        />
+        {slug && (
+          <p className="mt-1 text-xs text-dimmer">
+            Installs as <code>/{slug}</code> · file{" "}
+            <code>skills/{slug}/SKILL.md</code>
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-sm font-medium">Description</label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          placeholder="What it does, then a 'Use when…' trigger. This shows in the library index."
           className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-border-strong"
         />
       </div>
 
       <div>
-        <div className="mb-2 inline-flex rounded-md border border-border p-0.5 text-sm">
-          {(["folder", "zip"] as Mode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => {
-                setMode(m);
-                setPicked([]);
-              }}
-              className={`rounded px-3 py-1 ${
-                mode === m
-                  ? "bg-surface-2 text-text"
-                  : "text-dim hover:text-text"
-              }`}
-            >
-              {m === "folder" ? "Upload folder" : "Upload .zip"}
-            </button>
-          ))}
-        </div>
-
-        <div className="rounded-lg border border-dashed border-border-strong bg-surface p-5">
-          {mode === "folder" ? (
-            <input
-              ref={folderRef}
-              type="file"
-              onChange={onPick}
-              className="block w-full text-sm text-dim file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-3 file:py-1.5 file:text-sm file:text-text"
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              {...({ webkitdirectory: "", directory: "", multiple: true } as any)}
-            />
-          ) : (
-            <input
-              ref={zipRef}
-              type="file"
-              accept=".zip"
-              onChange={onPick}
-              className="block w-full text-sm text-dim file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-3 file:py-1.5 file:text-sm file:text-text"
-            />
-          )}
-          {picked.length > 0 && (
-            <p className="mt-3 text-xs text-dimmer">
-              {picked.length} item{picked.length === 1 ? "" : "s"} selected
-              {picked.length <= 8 && (
-                <>: {picked.map((p) => p.split("/").pop()).join(", ")}</>
-              )}
-            </p>
-          )}
-        </div>
+        <label className="mb-1.5 block text-sm font-medium">
+          Tags <span className="text-dimmer">(comma-separated, optional)</span>
+        </label>
+        <input
+          value={tagsInput}
+          onChange={(e) => setTagsInput(e.target.value)}
+          placeholder="e.g. database, migrations"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-border-strong"
+        />
       </div>
 
-      {error && (
-        <p className="rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
-          {error}
+      <div>
+        <label className="mb-1.5 block text-sm font-medium">
+          SKILL.md body
+        </label>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={12}
+          placeholder={
+            "The instructions Claude reads when the skill is active. Write it like briefing a teammate: what to do, the steps, any gotchas."
+          }
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs outline-none focus:border-border-strong"
+        />
+      </div>
+
+      <a
+        href={prUrl}
+        target="_blank"
+        rel="noreferrer"
+        aria-disabled={!ready}
+        onClick={(e) => {
+          if (!ready) e.preventDefault();
+        }}
+        className={`inline-block rounded-md px-4 py-2 text-sm font-medium ${
+          ready
+            ? "bg-accent text-[#0d0b09] hover:opacity-90"
+            : "cursor-not-allowed bg-surface-2 text-dimmer"
+        }`}
+      >
+        Open pull request on GitHub →
+      </a>
+      {!ready && (
+        <p className="text-xs text-dimmer">
+          Add a name and description to continue.
         </p>
       )}
-
-      {done && (
-        <div className="rounded-md border border-accent/40 bg-accent-soft px-3 py-3 text-sm">
-          <p className="text-accent">
-            ✓ Uploaded <code>{done.slug}</code> (v{done.version}).
-          </p>
-          <a
-            href={`/skills/${done.slug}`}
-            className="mt-1 inline-block text-accent underline"
-          >
-            View it →
-          </a>
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-[#0d0b09] hover:opacity-90 disabled:opacity-50"
-      >
-        {busy ? "Uploading…" : "Publish skill"}
-      </button>
-    </form>
+    </div>
   );
 }

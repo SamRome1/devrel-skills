@@ -1,11 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Skill zips can contain many small files; allow larger server action / route bodies.
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "25mb",
-    },
+  // The gallery reads the repo's skills/ folder at runtime. It isn't imported,
+  // so tell Next's file tracing to bundle it into the deployment.
+  outputFileTracingIncludes: {
+    "/**": ["./skills/**/*"],
   },
 };
 

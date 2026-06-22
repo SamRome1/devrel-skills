@@ -1,35 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { zipForInstall } from "@/lib/skill";
-import { downloadSkillFiles } from "@/lib/storage";
+import JSZip from "jszip";
+import { getSkill, readSkillFile, listSkills } from "@/lib/skills-fs";
 
-export const runtime = "nodejs";
+export const dynamic = "force-static";
 
+export function generateStaticParams() {
+  return listSkills().map((s) => ({ slug: s.slug }));
+}
+
+/**
+ * Build a zip whose contents extract to `<slug>/<relpath>`, so unzipping into
+ * ~/.claude/skills/ yields ~/.claude/skills/<slug>/SKILL.md.
+ */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
-  const supabase = db();
-
-  const { data: skill, error } = await supabase
-    .from("skills")
-    .select("slug, files")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error || !skill) {
+  const skill = getSkill(slug);
+  if (!skill) {
     return NextResponse.json({ error: "Skill not found." }, { status: 404 });
   }
 
-  const files = await downloadSkillFiles(skill.slug, skill.files);
-  const zip = await zipForInstall(skill.slug, files);
+  const zip = new JSZip();
+  for (const f of skill.files) {
+    zip.file(`${skill.slug}/${f.path}`, readSkillFile(skill.slug, f.path));
+  }
+  const bytes = await zip.generateAsync({
+    type: "uint8array",
+    compression: "DEFLATE",
+  });
 
-  return new NextResponse(zip as unknown as BodyInit, {
+  return new NextResponse(bytes as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${skill.slug}.zip"`,
-      "Cache-Control": "no-store",
     },
   });
 }

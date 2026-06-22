@@ -1,57 +1,57 @@
-# Optional web gallery
+# The web gallery
 
-The repo ships an optional Next.js + Supabase app — a searchable gallery with a
-web-based upload form. The git repo is the source of truth; this is a
-nice-to-have layer. You don't need it to use the library.
+The repo ships an optional Next.js app — a searchable gallery for the skills in
+this repo, plus a form that opens a prefilled pull request to add a new one. The
+**git repo is the single source of truth**: the app reads `skills/` directly and
+has no database. You don't need it to use the library.
 
-> Note: as built, the web app stores skills in Supabase (a `skills` table + a
-> storage bucket) rather than reading the repo's `skills/` folder. If the team
-> decides to host the gallery, the natural follow-up is to repoint it at the
-> repo (read `skills/` at build time) so the repo stays the single source of
-> truth. Until then, treat it as a standalone preview.
+## How it works
+
+- **Browse / detail / download** read the repo's `skills/<name>/SKILL.md`
+  folders at build time, so the gallery is just a prettier view of the repo.
+- **Install** shows the same `curl … | bash` one-liner the README uses — it
+  installs from `raw.githubusercontent.com`, so it works even if the app is down.
+- **Share a skill** builds a `SKILL.md` from the form and hands off to GitHub's
+  "new file" flow against `skills/<slug>/SKILL.md`. The contributor commits and
+  opens a PR in their own account — no token or login is stored by the app.
+
+There is no Supabase, no storage bucket, and nothing to keep in sync.
 
 ## Stack
 
-Next.js 16 · React 19 · Tailwind v4 · `@supabase/supabase-js` (service role,
-server-side only).
+Next.js 16 · React 19 · Tailwind v4. No backend services.
 
-## Setup
+## Run it
 
-1. **Create / pick a Supabase project** at https://supabase.com/dashboard.
-2. **Run the schema** — paste [`supabase/schema.sql`](../supabase/schema.sql)
-   into the SQL editor. It creates the `skills` table and a private `skills`
-   storage bucket.
-3. **Add env vars:**
+```bash
+npm install
+npm run dev
+```
 
-   ```bash
-   cp .env.local.example .env.local
-   ```
+Open http://localhost:3000. It reads the `skills/` folder beside it.
 
-   ```
-   SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   ```
+## Config (only when forking)
 
-4. **Run:**
+Skills install from, and PRs open against, `SamRome1/devrel-skills@main` by
+default. To point the app at a fork, set these (see `.env.local.example`):
 
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-   Open http://localhost:3000.
+```
+NEXT_PUBLIC_GITHUB_REPO=your-org/your-repo
+NEXT_PUBLIC_GITHUB_BRANCH=main
+```
 
 ## Routes
 
 | Piece | Path |
 | --- | --- |
 | Browse / search gallery | `/` |
-| Web upload | `/upload` |
+| Open a PR to add a skill | `/upload` |
 | Skill detail + install command | `/skills/<slug>` |
-| Build install zip on demand | `GET /api/download/<slug>` |
-| Install shell script | `GET /api/install/<slug>` |
+| Download install zip | `GET /api/download/<slug>` |
 
 ## Deploy
 
-Deploy to Vercel like the team's other Next.js apps; set `SUPABASE_URL` and
-`SUPABASE_SERVICE_ROLE_KEY` in the project environment.
+Deploy to Vercel like the team's other Next.js apps. No environment variables
+are required unless you're pointing it at a fork. Redeploy (or rebuild) when
+skills change so the static gallery picks them up — or wire a deploy hook to the
+repo's push.

@@ -56,8 +56,8 @@ web/ (the Next.js app)   ← optional browsable gallery — see below
 
 ## Optional: the web gallery
 
-This repo also contains a Next.js + Supabase app (the `src/`, `next.config.ts`,
-etc. at the root) — a prettier, searchable gallery and web-upload UI. **It's
-optional.** The git repo is the source of truth; the web app is a nice-to-have
-layer that can be pointed at this repo's `skills/` folder later if the team
-wants a hosted index. To run it, see [`docs/WEBAPP.md`](docs/WEBAPP.md).
+This repo also contains a Next.js app (the `src/`, `next.config.ts`, etc. at the
+root) — a prettier, searchable gallery with a web form that opens a prefilled PR
+to add a skill. **It's optional**, and it reads this repo's `skills/` folder
+directly — the git repo stays the single source of truth, with no database to
+keep in sync. To run it, see [`docs/WEBAPP.md`](docs/WEBAPP.md).

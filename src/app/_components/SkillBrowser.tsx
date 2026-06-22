@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { SkillRow } from "@/lib/db";
+import type { Skill } from "@/lib/skills-fs";
 
-export function SkillBrowser({ skills }: { skills: SkillRow[] }) {
+export function SkillBrowser({ skills }: { skills: Skill[] }) {
   const [query, setQuery] = useState("");
 
   const allTags = useMemo(() => {
@@ -24,7 +24,7 @@ export function SkillBrowser({ skills }: { skills: SkillRow[] }) {
         s.name.toLowerCase().includes(q) ||
         s.slug.toLowerCase().includes(q) ||
         s.description.toLowerCase().includes(q) ||
-        s.author.toLowerCase().includes(q) ||
+        (s.author?.toLowerCase().includes(q) ?? false) ||
         s.tags.some((t) => t.toLowerCase().includes(q))
       );
     });
@@ -36,7 +36,7 @@ export function SkillBrowser({ skills }: { skills: SkillRow[] }) {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search skills by name, description, author, tag…"
+          placeholder="Search skills by name, description, tag…"
           className="w-full rounded-md border border-border bg-surface px-3.5 py-2.5 text-sm outline-none placeholder:text-dimmer focus:border-border-strong"
         />
         {allTags.length > 0 && (
@@ -71,7 +71,7 @@ export function SkillBrowser({ skills }: { skills: SkillRow[] }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {filtered.map((s) => (
           <Link
-            key={s.id}
+            key={s.slug}
             href={`/skills/${s.slug}`}
             className="group rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border-strong"
           >
@@ -79,17 +79,17 @@ export function SkillBrowser({ skills }: { skills: SkillRow[] }) {
               <h2 className="font-medium tracking-tight group-hover:text-accent">
                 {s.name}
               </h2>
-              <span className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-dim">
-                v{s.version}
-              </span>
+              <code className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-dim">
+                /{s.slug}
+              </code>
             </div>
             <p className="mt-1.5 line-clamp-2 text-sm text-dim">
               {s.description || "No description."}
             </p>
             <div className="mt-3 flex items-center justify-between text-xs text-dimmer">
-              <span>by {s.author}</span>
+              <span>{s.author ? `by ${s.author}` : " "}</span>
               <span>
-                {s.file_count} file{s.file_count === 1 ? "" : "s"}
+                {s.files.length} file{s.files.length === 1 ? "" : "s"}
               </span>
             </div>
             {s.tags.length > 0 && (

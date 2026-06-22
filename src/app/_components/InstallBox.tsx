@@ -63,8 +63,8 @@ export function InstallBox({
         </button>
       </div>
       <p className="mt-2 text-xs text-dimmer">
-        Add <code>-s -- --project</code> to install into the current project&apos;s{" "}
-        <code>.claude/skills</code> instead.
+        Pass <code>--project</code> before the skill name to install into the
+        current project&apos;s <code>.claude/skills</code> instead.
       </p>
     </div>
   );

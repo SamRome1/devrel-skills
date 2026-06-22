@@ -2,23 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { db, type SkillRow } from "@/lib/db";
-import { baseUrl } from "@/lib/url";
+import { getSkill, listSkills } from "@/lib/skills-fs";
+import { installCommand, skillTreeUrl } from "@/lib/config";
 import { InstallBox } from "@/app/_components/InstallBox";
 
-export const dynamic = "force-dynamic";
-
-async function getSkill(slug: string): Promise<SkillRow | null> {
-  try {
-    const { data } = await db()
-      .from("skills")
-      .select("*")
-      .eq("slug", slug)
-      .maybeSingle();
-    return (data as SkillRow) ?? null;
-  } catch {
-    return null;
-  }
+export function generateStaticParams() {
+  return listSkills().map((s) => ({ slug: s.slug }));
 }
 
 // Strip frontmatter for a cleaner reading view (metadata is shown separately).
@@ -32,19 +21,15 @@ export default async function SkillPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const skill = await getSkill(slug);
+  const skill = getSkill(slug);
   if (!skill) notFound();
 
-  const base = await baseUrl();
-  const command = `curl -fsSL ${base}/api/install/${skill.slug} | bash`;
+  const command = installCommand(skill.slug);
   const downloadHref = `/api/download/${skill.slug}`;
 
   return (
     <div>
-      <Link
-        href="/"
-        className="text-sm text-dim hover:text-text"
-      >
+      <Link href="/" className="text-sm text-dim hover:text-text">
         ← All skills
       </Link>
 
@@ -54,8 +39,16 @@ export default async function SkillPage({
             {skill.name}
           </h1>
           <p className="mt-1 text-sm text-dim">
-            <code className="text-dim">/{skill.slug}</code> · by {skill.author}{" "}
-            · v{skill.version}
+            <code className="text-dim">/{skill.slug}</code>
+            {skill.author && <> · by {skill.author}</>} ·{" "}
+            <a
+              href={skillTreeUrl(skill.slug)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent hover:underline"
+            >
+              View on GitHub
+            </a>
           </p>
         </div>
       </div>
@@ -96,7 +89,7 @@ export default async function SkillPage({
 
         <aside>
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-dimmer">
-            Files ({skill.file_count})
+            Files ({skill.files.length})
           </h3>
           <ul className="space-y-1 text-xs">
             {skill.files.map((f) => (
